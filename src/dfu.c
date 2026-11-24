@@ -515,7 +515,8 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		logger(LL_INFO, "Nonce: ");
 		logger_dump_hex(LL_INFO, client->nonce, client->nonce_size);
 
-		if (nonce_changed && !(client->flags & FLAG_CUSTOM)) {
+		if (nonce_changed && !(client->flags & FLAG_CUSTOM) &&
+			!(client->image4supported && client->root_ticket && plist_dict_get_item(client->tss, "ApImg4Ticket"))) {
 			// Welcome iOS5. We have to re-request the TSS with our nonce.
 			plist_free(client->tss);
 			if (get_tss_response(client, build_identity, &client->tss) < 0) {

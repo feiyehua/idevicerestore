@@ -1278,7 +1278,10 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			return -1;
 		}
 		
-		if (client->mode == MODE_RESTORE && client->root_ticket) {
+		int use_local_ap_ticket = client->root_ticket && (client->mode == MODE_RESTORE ||
+			(client->image4supported && !(client->flags & FLAG_SHSHONLY) &&
+			 (client->mode == MODE_DFU || client->mode == MODE_RECOVERY)));
+		if (use_local_ap_ticket) {
 			plist_t ap_ticket = plist_new_data((char*)client->root_ticket, client->root_ticket_len);
 			if (!ap_ticket) {
 				logger(LL_ERROR, "Failed to create ApImg4Ticket node value.\n");
@@ -1286,15 +1289,18 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 			client->tss = plist_new_dict();
 			if (!client->tss) {
+				plist_free(ap_ticket);
 				logger(LL_ERROR, "Failed to create ApImg4Ticket node.\n");
 				return -1;
 			}
 			plist_dict_set_item(client->tss, "ApImg4Ticket", ap_ticket);
-		} else {
-			if (get_tss_response(client, build_identity, &client->tss) < 0) {
-				logger(LL_ERROR, "Unable to get SHSH blobs for this device\n");
-				return -1;
-			}
+			logger(LL_INFO, "Using supplied ApTicket for restore personalization\n");
+		} else if (get_tss_response(client, build_identity, &client->tss) < 0) {
+			logger(LL_ERROR, "Unable to get SHSH blobs for this device\n");
+			return -1;
+		}
+
+		if (!use_local_ap_ticket || client->mode != MODE_RESTORE) {
 			if (client->macos_variant) {
 				if (get_local_policy_tss_response(client, build_identity, &client->tss_localpolicy) < 0) {
 					logger(LL_ERROR, "Unable to get SHSH blobs for this device (local policy)\n");
